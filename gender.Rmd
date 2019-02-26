@@ -1,0 +1,35 @@
+---
+title: "Gender Diversity in R vs Python"
+output: html_notebook
+---
+
+Source for top 100 Python packages over the last year: https://hugovk.github.io/top-pypi-packages/
+Scrape this.
+
+Guidance on gender of Chinese names: http://blog.tutorming.com/mandarin-chinese-learning-tips/difference-chinese-male-and-female-names-gender
+
+Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror
+```{r}
+library(installr)
+library(ggplot2)
+library(data.table) #for downloading
+library(tidyverse)
+
+source(file="download_RStudio_CRAN_data.R") 
+
+# ----------------------------------------------------------------
+#select 5 random days from the last year
+# Read data from RStudio site
+RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-5,END = Sys.Date(),sample=5)
+# read .gz compressed files form local directory
+RStudio_CRAN_data <- read_RStudio_CRAN_data(RStudio_CRAN_dir)
+ 
+dim(RStudio_CRAN_data)
+
+# Find the most downloaded packages
+pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>% 
+  as_tibble(.name_repair = make.names,c("downloads")) %>% 
+  rename(package=X)
+
+save(pkg_list,file="data/r_pkg_list.rdata")
+```
