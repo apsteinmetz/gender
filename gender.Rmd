@@ -14,6 +14,8 @@ library(installr)
 library(ggplot2)
 library(data.table) #for downloading
 library(tidyverse)
+library(purrr)
+library(jsonlite)
 
 source(file="download_RStudio_CRAN_data.R") 
 
@@ -33,3 +35,51 @@ pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>%
 
 save(pkg_list,file="data/r_pkg_list.rdata")
 ```
+Build functions to get contributors to packages and then the real names of those contributors.
+Search for relevant repo with just repo name, no user.
+
+https://api.github.com/search/repositories?q=dplyr%20is:name+language:r&sort=stars&order=desc
+
+will return:
+      "full_name": "tidyverse/dplyr",
+
+use that to get contributors:
+
+Contributor url: https://api.github.com/repos/tidyverse/dplyr/contributors
+
+will return all contributors with the JSON form:
+   "url": "https://api.github.com/users/romainfrancois",
+
+and that will return:
+   "name": "Romain François",
+
+
+```{r}
+library(dplyr)
+library(jsonlite)
+
+#this would actually be a list of multiple repos
+repo_name <- "dplyr"
+# we don't know the github username associated with the package to construct a search
+# to get the most likely candidate
+search_url <- paste0("https://api.github.com/search/repositories?q=",
+                     repo_name,
+                     ".%20is:name+language:r&sort=stars&order=desc")
+
+
+# first api call.  would need to would need to loop/map/apply over multiple contributors repo names
+all_repos<-jsonlite::read_json(search_url,simplifyVector = TRUE)
+# assume first repo is target.  Hope so.
+target_repo<-all_repos$items$full_name[1]
+search_url <- paste0("https://api.github.com/repos/",
+                     target_repo,
+                     "/contributors")
+#second api call
+contributors <- jsonlite::read_json(search_url,simplifyVector = TRUE)
+
+#third api call. would need to loop/map/apply over multiple contributors
+real_name <- jsonlite::read_json(contributors$url[1])$name
+real_name
+
+```
+
