@@ -3,38 +3,52 @@ title: "Gender Diversity in R vs Python"
 output: html_notebook
 ---
 
-Source for top 100 Python packages over the last year: https://hugovk.github.io/top-pypi-packages/
-Scrape this.
-
 Guidance on gender of Chinese names: http://blog.tutorming.com/mandarin-chinese-learning-tips/difference-chinese-male-and-female-names-gender
 
-Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror
 ```{r}
-library(installr)
-library(ggplot2)
-library(data.table) #for downloading
 library(tidyverse)
 library(purrr)
 library(jsonlite)
+library(rvest)
+library(installr)
+library(data.table) #for downloading CRAN/RStudio logs
 
 source(file="download_RStudio_CRAN_data.R") 
+```
 
+Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror.
+
+```{r get_top_R_packages}
 # ----------------------------------------------------------------
-#select 5 random days from the last year
+#select 5 random days from the last six months
 # Read data from RStudio site
-RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-5,END = Sys.Date(),sample=5)
+RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-180,END = Sys.Date(),sample=5)
 # read .gz compressed files form local directory
 RStudio_CRAN_data <- read_RStudio_CRAN_data(RStudio_CRAN_dir)
  
 dim(RStudio_CRAN_data)
 
 # Find the most downloaded packages
-pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>% 
+r_pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>% 
   as_tibble(.name_repair = make.names,c("downloads")) %>% 
   rename(package=X)
 
-save(pkg_list,file="data/r_pkg_list.rdata")
+save(r_pkg_list,file="data/r_pkg_list.rdata")
 ```
+
+Source for top 100 Python packages over the last year: https://hugovk.github.io/top-pypi-packages/
+Get json (how helpful!).
+
+```{r get_top_python_packages}
+py_pkgs_raw<-read_json("https://hugovk.github.io/top-pypi-packages/top-pypi-packages-365-days.json",
+                       simplifyVector = TRUE)
+python_pkg_list <- py_pkgs_raw$rows[1:100,] %>% 
+  as_tibble() %>% 
+  rename(package=project,downloads=download_count)
+save(python_pkg_list,file="data/python_pkg_list.rdata")
+
+```
+
 Build functions to get contributors to packages and then the real names of those contributors.
 Search for relevant repo with just repo name, no user.
 
@@ -54,23 +68,33 @@ and that will return:
    "name": "Romain François",
 
 
-```{r}
+```{r get_package_contributors}
 library(dplyr)
 library(jsonlite)
 
 #this would actually be a list of multiple repos
-repo_name <- "dplyr"
+repo_name <- "pip"
+language <- python
+
+get_contrib_names <- function(repo,language="r"){
 # we don't know the github username associated with the package to construct a search
 # to get the most likely candidate
 search_url <- paste0("https://api.github.com/search/repositories?q=",
                      repo_name,
-                     ".%20is:name+language:r&sort=stars&order=desc")
+                     ".%20is:name+language:",
+                     language,
+                     "&sort=stars&order=desc")
 
 
 # first api call.  would need to would need to loop/map/apply over multiple contributors repo names
 all_repos<-jsonlite::read_json(search_url,simplifyVector = TRUE)
-# assume first repo is target.  Hope so.
-target_repo<-all_repos$items$full_name[1]
+
+regex_str <- paste0(".+/",repo_name,"$")
+target_repo<-all_repos$items %>% 
+  filter(str_detect(full_name,regex_str)) %>% 
+  pull(full_name)
+# no error checking if repo is not found
+
 search_url <- paste0("https://api.github.com/repos/",
                      target_repo,
                      "/contributors")
@@ -78,8 +102,13 @@ search_url <- paste0("https://api.github.com/repos/",
 contributors <- jsonlite::read_json(search_url,simplifyVector = TRUE)
 
 #third api call. would need to loop/map/apply over multiple contributors
-real_name <- jsonlite::read_json(contributors$url[1])$name
-real_name
+get_name <- function(contrib_url){
+  return(jsonlite::read_json(contrib_url)$name)
+}
 
+return(get_name(contributors$url[1]))
+}
+
+get_contrib_names(repo,language)
 ```
 
