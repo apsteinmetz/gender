@@ -24,30 +24,37 @@ Use the cranlogs api from RStudio to get top package downloads from their CRAN m
 # ----------------------------------------------------------------
 #select 5 random days from the last six months
 # Read data from RStudio site
-RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-180,END = Sys.Date(),sample=5)
-# read .gz compressed files form local directory
-RStudio_CRAN_data <- read_RStudio_CRAN_data(RStudio_CRAN_dir)
- 
-dim(RStudio_CRAN_data)
+if (!file.exists("data/r_pkg_list.rdata")) {
+  RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-180,END = Sys.Date(),sample=5)
+  # read .gz compressed files form local directory
+  RStudio_CRAN_data <- read_RStudio_CRAN_data(RStudio_CRAN_dir)
+  
+  dim(RStudio_CRAN_data)
+  
+  # Find the most downloaded packages
+  r_pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>% 
+    as_tibble(.name_repair = make.names,c("downloads")) %>% 
+    rename(package=X)
+  
+  save(r_pkg_list,file="data/r_pkg_list.rdata")
+} else load("data/r_pkg_list.rdata")
 
-# Find the most downloaded packages
-r_pkg_list <- most_downloaded_packages(RStudio_CRAN_data,n=100) %>% 
-  as_tibble(.name_repair = make.names,c("downloads")) %>% 
-  rename(package=X)
 
-save(r_pkg_list,file="data/r_pkg_list.rdata")
 ```
 
 Source for top 100 Python packages over the last year: https://hugovk.github.io/top-pypi-packages/
 Get json (how helpful!).
 
 ```{r get_top_python_packages}
-py_pkgs_raw<-read_json("https://hugovk.github.io/top-pypi-packages/top-pypi-packages-365-days.json",
-                       simplifyVector = TRUE)
-python_pkg_list <- py_pkgs_raw$rows[1:100,] %>% 
-  as_tibble() %>% 
-  rename(package=project,downloads=download_count)
-save(python_pkg_list,file="data/python_pkg_list.rdata")
+if (!file.exists("data/python_pkg_list.rdata")){
+  
+  py_pkgs_raw<-read_json("https://hugovk.github.io/top-pypi-packages/top-pypi-packages-365-days.json",
+                         simplifyVector = TRUE)
+  python_pkg_list <- py_pkgs_raw$rows[1:100,] %>% 
+    as_tibble() %>% 
+    rename(package=project,downloads=download_count)
+  save(python_pkg_list,file="data/python_pkg_list.rdata")
+} else load("data/python_pkg_list.rdata")
 
 ```
 
@@ -83,7 +90,7 @@ my_gh <- function(end_point) {
 }
 
 # --------------------------------------------------------------------------------
-get_contrib_info <- function(repo_name,language="r"){
+get_contrib_info <- function(repo_name="dplyr",language="r"){
   base_url <- "https://api.github.com"
   print(repo_name)
   # we don't know the github username associated with the package to construct a search
@@ -137,7 +144,7 @@ get_contrib_info <- function(repo_name,language="r"){
 }
 
 # --------------------------------------------------------------------
-get_contrib_info_gh <- function(repo_name,language="r"){
+get_contrib_info_gh <- function(repo_name="dplyr",language="r"){
   print(repo_name)
   # we don't know the github username associated with the package to construct a search
   # to get the most likely candidate
@@ -164,19 +171,21 @@ get_contrib_info_gh <- function(repo_name,language="r"){
                        target_repo,
                        "/contributors")
   #second api call
-  contributors <- my_gh(search_url)
-  %>% bind_rows() %>%   
+  contributors <- my_gh(search_url)  %>% 
+    bind_rows() %>%   
     select(login,url,avatar_url)
 
     #third api call. would need to loop/map/apply over multiple contributors
   # need to strip base url
   get_name <- function(contrib_url){
-    return(my_gh(contrib_url)$name)
+    user_data <- my_gh(contrib_url)
+    # just return login name if real name is missing
+    if (is_empty(user_data$name)) return(user_data$login) else return(user_data$name) 
   }
   
   contrib_names<-map(contributors$url,get_name) %>% unlist()
   
-  print(paste(length(contrib_names," contributors")))
+  print(paste(length(contrib_names)," contributors"))
   
   contrib_info <- tibble(language=language,
                          package=repo_name,
