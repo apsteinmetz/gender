@@ -82,77 +82,49 @@ library(dplyr)
 library(jsonlite)
 
 #this would actually be a list of multiple repos
-repo_name <- "rlang"
+repo_name <- "Rcpp"
 language <- "r"
 
 my_gh <- function(end_point) {
     return(jsonlite::fromJSON(jsonlite::toJSON(gh::gh(end_point)),simplifyVector = T))
 }
 
-# --------------------------------------------------------------------------------
-get_contrib_info <- function(repo_name="dplyr",language="r"){
-  base_url <- "https://api.github.com"
-  print(repo_name)
-  # we don't know the github username associated with the package to construct a search
-  # to get the most likely candidate
-  search_url <- paste0("/search/repositories?q=",
-                       repo_name,
-                       ".%20is:name+language:",
-                       language,
-                       "&sort=stars&order=desc")
-  
-  
-  # first api call.  would need to would need to loop/map/apply over 
-  # multiple contributors repo names
-  all_repos<-jsonlite::read_json(search_url,simplifyVector = TRUE)
-  
-  # get full path for exact match on repo name
-  regex_str <- paste0(".+/",repo_name,"$")
-  target_repo<-all_repos$items %>% 
-    filter(str_detect(full_name,regex_str)) %>% 
-    pull(full_name) %>% head(1)
-  # no error checking if repo is not found
-  print(target_repo)
-  
-  # there might be more than one user with repo of the same name
-  # Since they will be in order of download count, take just the first one
-  search_url <- paste0("https://api.github.com/repos/",
-                       target_repo[1],
-                       "/contributors")
-  #second api call
-  contributors <- jsonlite::read_json(search_url,simplifyVector = TRUE) %>% 
-    select(login,url,avatar_url)
-  
-  #third api call. would need to loop/map/apply over multiple contributors
-  get_name <- function(contrib_url){
-    return(jsonlite::read_json(contrib_url)$name)
-  }
-  
-  contrib_names<-map(contributors$url,get_name) %>% unlist()
-  
-  print(paste(length(contrib_names," contributors")))
-  
-  contrib_info <- tibble(language=language,
-                         package=repo_name,
-                         path=target_repo,
-                         contributor=contrib_names) %>% 
-    bind_cols(contributors) %>% 
-    select(-url)
-  
-  
-  return(contrib_info)
+json_to_df <- function(json){
+    return(jsonlite::fromJSON(jsonlite::toJSON(json),simplifyVector = T))
 }
 
 # --------------------------------------------------------------------
-get_contrib_info_gh <- function(repo_name="dplyr",language="r"){
+get_contributor_ids <- function(target_repo){
+# loop through all pages of contributors  
+  search_url <- paste0("/repos/",
+                       target_repo,
+                       "/contributors")
+  contributors_json <- gh(search_url)
+  contrib_node <- contributors_json
+  repeat {
+    contrib_node <- try(gh_next(contrib_node),silent=TRUE)
+    if (is(contrib_node) == "try-error") break
+    contributors_json <- c(contributors_json,contrib_node)  
+  }
+
+  contributors <- json_to_df(contributors_json) %>%
+    bind_rows() %>%   
+    select(login,url,avatar_url)
+  return(contributors)
+}
+
+# --------------------------------------------------------------------
+get_contrib_info <- function(repo_name="dplyr",language="r"){
   print(repo_name)
   # we don't know the github username associated with the package to construct a search
   # to get the most likely candidate
   search_url <- paste0("/search/repositories?q=",
-                       repo_name,
-                       ".%20is:name+language:",
-                       language,
-                       "&sort=stars&order=desc")
+                       repo_name
+ #                    ,  "+is:name"
+#                      , "+language:", language
+#                     ,"&sort=stars",
+#                     ,   "&order=desc"
+  )
   
   
   # first api call.  would need to would need to loop/map/apply over 
@@ -166,24 +138,19 @@ get_contrib_info_gh <- function(repo_name="dplyr",language="r"){
   print(target_repo)
   
   # there might be more than one user with repo of the same name
-  # Since they will be in order of download count, take just the first one
-  search_url <- paste0("/repos/",
-                       target_repo,
-                       "/contributors")
+  # Since they will be in order of github "score", take just the first one
   #second api call
-  contributors <- my_gh(search_url)  %>% 
-    bind_rows() %>%   
-    select(login,url,avatar_url)
-
-    #third api call. would need to loop/map/apply over multiple contributors
+  contributor_ids <- get_contributor_ids(target_repo)
+    
+  #third api call. would need to loop/map/apply over multiple contributors
   # need to strip base url
   get_name <- function(contrib_url){
     user_data <- my_gh(contrib_url)
     # just return login name if real name is missing
-    if (is_empty(user_data$name)) return(user_data$login) else return(user_data$name) 
+    if (is_empty(user_data$name)) return(user_data$login) else return(user_data$name)
   }
   
-  contrib_names<-map(contributors$url,get_name) %>% unlist()
+  contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
   
   print(paste(length(contrib_names)," contributors"))
   
