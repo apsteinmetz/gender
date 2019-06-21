@@ -120,8 +120,8 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   # to get the most likely candidate
   search_url <- paste0("/search/repositories?q=",
                        repo_name
- #                    ,  "+is:name"
-#                      , "+language:", language
+                      , "+language:", language
+#                     ,  "+is:name"
 #                     ,"&sort=stars",
 #                     ,   "&order=desc"
   )
@@ -158,8 +158,8 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
                          package=repo_name,
                          path=target_repo,
                          contributor=contrib_names) %>% 
-    bind_cols(contributors) %>% 
-    select(-url)
+    bind_cols(contributor_ids) %>% 
+    select(-url) %>% unnest()
   
   
   return(contrib_info)
@@ -169,11 +169,10 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
 
 ```{r}
 load("data/r_pkg_list.rdata")
+# Rcpp package is not categorized as R langauge so I got it manually.
+r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
 load("data/python_pkg_list.rdata")
 
-dummy<- function(repo_name,language){
-  return(tibble(package=repo_name,language=language,stuff=1:3))
-}
 dat <- map(r_pkg_list$package,get_contrib_info,language="r") %>% bind_rows()
 ```
 
