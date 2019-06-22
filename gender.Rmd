@@ -184,10 +184,30 @@ load("data/python_pkg_list.rdata")
 
 # use loop so we can save intermediate steps
 r_pkg_contributors <- NULL
-for(pkg in r_pkg_list$package[35:99]) {
+for(pkg in r_pkg_list$package) {
 r_pkg_contributors <- r_pkg_contributors %>% 
   bind_rows(get_contrib_info(pkg,language="r"))
   save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
 }
+python_pkg_contributors <- NULL
+for(pkg in python_pkg_list$package) {
+python_pkg_contributors <- r_pkg_contributors %>% 
+  bind_rows(get_contrib_info(pkg,language="python"))
+  save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
+}  
+```
+Now that we have the package contributor database. Do some analysis.
+
+```{r}
+load("data/r_pkg_contributors.rdata")
+
+#summarize what we found
+pkg_count <- r_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors))
+
+summary(pkg_count)
 ```
 
+There are 73 out of the top 100 R packages with repos on Github.  The average number of contributors is 30. 300 people have contributed to the `fs` package, which is implements the linux file library `libuv`.
