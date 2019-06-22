@@ -102,7 +102,7 @@ get_contributor_ids <- function(target_repo){
   contributors_json <- gh(search_url)
   
   # return null in case of no contributors
-  if (nchar(contributors_json)==0) return(NULL)
+  if (nchar(contributors_json[1])==0) return(NULL)
   
   contrib_node <- contributors_json
   repeat {
@@ -184,7 +184,7 @@ load("data/python_pkg_list.rdata")
 
 # use loop so we can save intermediate steps
 r_pkg_contributors <- NULL
-for(pkg in r_pkg_list$package) {
+for(pkg in r_pkg_list$package[35:99]) {
 r_pkg_contributors <- r_pkg_contributors %>% 
   bind_rows(get_contrib_info(pkg,language="r"))
   save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
