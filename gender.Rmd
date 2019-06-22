@@ -136,9 +136,9 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   
   # first api call.  would need to would need to loop/map/apply over 
   # multiple contributors repo names
-  all_repos <- my_gh(search_url) %>% 
-    .$items %>% 
-    select(name,full_name)
+  repos <- my_gh(search_url) %>% .$items
+  # return NULL if no repos in github are found
+  if (length(repos) == 0) return(NULL)
   
   # get full path for exact match on repo name
   # there might be more than one user with repo of the same name
@@ -146,23 +146,22 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   target_repo <- all_repos %>% 
     filter(name == repo_name) %>%
     pull(full_name) %>% 
-   .[1] %>% 
+    .[1] %>% 
     unlist()
+  # return NULL if no repos in github are found
+  if (is.null(target_repo)) return(NULL)
+  
   #second api call
   # get user urls for all contributors
-  if (!is.null(target_repo)){
-    contributor_ids <- get_contributor_ids(target_repo)
-    contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
-    print(paste(length(contrib_names)," contributors"))
-    contrib_info <- tibble(language=language,
-                           package=repo_name,
-                           path=target_repo,
-                           contributor=contrib_names) %>% 
-      bind_cols(contributor_ids) %>% 
-      select(-url) %>% unnest()
-  } else {
-    contrib_info <- NULL
-  }
+  contributor_ids <- get_contributor_ids(target_repo)
+  contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
+  print(paste(length(contrib_names)," contributors"))
+  contrib_info <- tibble(language=language,
+                         package=repo_name,
+                         path=target_repo,
+                         contributor=contrib_names) %>% 
+    bind_cols(contributor_ids) %>% 
+    select(-url) %>% unnest()
   return(contrib_info)
 }
 ```
@@ -172,10 +171,14 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
 load("data/r_pkg_list.rdata")
 # Rcpp package is not categorized as R langauge so I got it manually.
 r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
-# change periods in package name so regex is not confused
-r_pkg_list <- str_replace(r_pkg_list$package,"\\.","\\.")
 load("data/python_pkg_list.rdata")
 
-dat <- map(r_pkg_list$package,get_contrib_info,language="r") %>% bind_rows()
+# use loop so we can save intermediate steps
+r_pkg_contributors <- NULL
+for(pkg in r_pkg_list$package) {
+r_pkg_contributors <- r_pkg_contributors %>% 
+  bind_rows(get_contrib_info(pkg,language="r"))
+  save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
+}
 ```
 
