@@ -100,6 +100,10 @@ get_contributor_ids <- function(target_repo){
                        target_repo,
                        "/contributors")
   contributors_json <- gh(search_url)
+  
+  # return null in case of no contributors
+  if (nchar(contributors_json)==0) return(NULL)
+  
   contrib_node <- contributors_json
   repeat {
     contrib_node <- try(gh_next(contrib_node),silent=TRUE)
@@ -143,7 +147,8 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   # get full path for exact match on repo name
   # there might be more than one user with repo of the same name
   # Since they will be in order of github "score", take just the first one
-  target_repo <- all_repos %>% 
+  target_repo <- repos %>% 
+    select(name,full_name) %>% 
     filter(name == repo_name) %>%
     pull(full_name) %>% 
     .[1] %>% 
@@ -154,6 +159,10 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   #second api call
   # get user urls for all contributors
   contributor_ids <- get_contributor_ids(target_repo)
+  
+  # return null in case of no contributors
+  if (is.null(contributor_ids)) return(NULL)
+  
   contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
   print(paste(length(contrib_names)," contributors"))
   contrib_info <- tibble(language=language,
