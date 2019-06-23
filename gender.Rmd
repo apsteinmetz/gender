@@ -250,4 +250,13 @@ c_r <- r_pkg_contributors %>%
 
 inner_join(c_r,c_p,by=c("contributor","login")) %>% arrange(desc(r_packages))
 ```
+```{r}
+load("data/names_90.rdata")
+
+r_pkg_contributors <-r_pkg_contributors %>%
+  separate("contributor",into=c("first"),remove=FALSE,extra="drop")
+
+python_pkg_contributors <-python_pkg_contributors %>%
+  separate("contributor",into=c("first"),remove=FALSE,extra="drop")
+```
 
