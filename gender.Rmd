@@ -111,10 +111,10 @@ get_contributor_ids <- function(target_repo){
     contributors_json <- c(contributors_json,contrib_node)  
   }
 
-  contributors <- json_to_df(contributors_json) %>%
+  contributor_ids <- json_to_df(contributors_json) %>%
     bind_rows() %>%   
     select(login,url,avatar_url)
-  return(contributors)
+  return(contributor_ids)
 }
 
 # ---------------------------------------------------------------------------
@@ -190,8 +190,8 @@ r_pkg_contributors <- r_pkg_contributors %>%
   save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
 }
 python_pkg_contributors <- NULL
-for(pkg in python_pkg_list$package) {
-python_pkg_contributors <- r_pkg_contributors %>% 
+for(pkg in python_pkg_list$package[57:100]) {
+python_pkg_contributors <- python_pkg_contributors %>% 
   bind_rows(get_contrib_info(pkg,language="python"))
   save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
 }  
@@ -202,12 +202,21 @@ Now that we have the package contributor database. Do some analysis.
 load("data/r_pkg_contributors.rdata")
 
 #summarize what we found
-pkg_count <- r_pkg_contributors %>% 
+r_pkg_contributors %>% 
   group_by(package) %>% 
   summarise(contributors=n()) %>% 
-  arrange(desc(contributors))
-
-summary(pkg_count)
+  arrange(desc(contributors)) %>% 
+  summary()
 ```
 
 There are 73 out of the top 100 R packages with repos on Github.  The average number of contributors is 30. 300 people have contributed to the `fs` package, which is implements the linux file library `libuv`.
+
+Who are the most prolific contributors among the top packages.  We note that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors.  No one tidyverse package acts as a proxy for the rest, however.
+```{r}
+r_pkg_contributors %>% 
+  group_by(contributor) %>% 
+  summarise(packages=n()) %>% 
+  arrange(desc(packages))
+
+```
+
