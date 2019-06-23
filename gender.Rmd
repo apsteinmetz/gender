@@ -220,3 +220,34 @@ r_pkg_contributors %>%
 
 ```
 
+```{r}
+load("data/python_pkg_contributors.rdata")
+
+#summarize what we found
+python_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors)) %>% 
+  summary()
+```
+```{r}
+python_pkg_contributors %>% 
+  group_by(contributor) %>% 
+  summarise(packages=n()) %>% 
+  arrange(desc(packages))
+
+```
+
+Who has contributed to both top R and Python packages?  Grouping by login name ensures that we don't get two different people with the same name.
+```{r}
+c_p <- python_pkg_contributors %>% 
+  group_by(login,contributor) %>% 
+  summarise(python_packages=n())
+
+c_r <- r_pkg_contributors %>% 
+  group_by(login,contributor) %>% 
+  summarise(r_packages=n())
+
+inner_join(c_r,c_p,by=c("contributor","login")) %>% arrange(desc(r_packages))
+```
+
