@@ -183,14 +183,14 @@ r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
 load("data/python_pkg_list.rdata")
 
 # use loop so we can save intermediate steps
-r_pkg_contributors <- NULL
+#r_pkg_contributors <- NULL
 for(pkg in r_pkg_list$package) {
 r_pkg_contributors <- r_pkg_contributors %>% 
   bind_rows(get_contrib_info(pkg,language="r"))
   save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
 }
-python_pkg_contributors <- NULL
-for(pkg in python_pkg_list$package[57:100]) {
+#python_pkg_contributors <- NULL
+for(pkg in python_pkg_list$package) {
 python_pkg_contributors <- python_pkg_contributors %>% 
   bind_rows(get_contrib_info(pkg,language="python"))
   save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
