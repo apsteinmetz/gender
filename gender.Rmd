@@ -180,22 +180,27 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
 load("data/r_pkg_list.rdata")
 # Rcpp package is not categorized as R langauge so I got it manually.
 r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
-load("data/python_pkg_list.rdata")
-
+if (!file.exists("data/r_pkg_contributors.rdata")){
+  r_pkg_contributors <- NULL
 # use loop so we can save intermediate steps
-#r_pkg_contributors <- NULL
-for(pkg in r_pkg_list$package) {
-r_pkg_contributors <- r_pkg_contributors %>% 
-  bind_rows(get_contrib_info(pkg,language="r"))
-  save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
-}
-#python_pkg_contributors <- NULL
-for(pkg in python_pkg_list$package) {
-python_pkg_contributors <- python_pkg_contributors %>% 
-  bind_rows(get_contrib_info(pkg,language="python"))
-  save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
-}  
+  for(pkg in r_pkg_list$package) {
+    r_pkg_contributors <- r_pkg_contributors %>% 
+      bind_rows(get_contrib_info(pkg,language="r"))
+    save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
+  }
+} else load("data/r_pkg_contributors.rdata")
+
+load("data/python_pkg_list.rdata")
+if (!file.exists("data/python_pkg_contributors.rdata")){
+  python_pkg_contributors <- NULL
+  for(pkg in python_pkg_list$package) {
+    python_pkg_contributors <- python_pkg_contributors %>% 
+      bind_rows(get_contrib_info(pkg,language="python"))
+    save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
+  }  
+} else load("data/r_pkg_contributors.rdata")
 ```
+#Analysis
 Now that we have the package contributor database. Do some analysis.
 
 ```{r}
@@ -210,6 +215,18 @@ r_pkg_contributors %>%
 ```
 
 There are 73 out of the top 100 R packages with repos on Github.  The average number of contributors is 30. 300 people have contributed to the `fs` package, which is implements the linux file library `libuv`.
+
+View the distribution of contributor count.
+```{r}
+r_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors)) %>% 
+  ggplot(aes(as_factor(package),contributors)) + geom_col()+ coord_flip()
+```
+
+
+
 
 Who are the most prolific contributors among the top packages.  We note that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors.  No one tidyverse package acts as a proxy for the rest, however.
 ```{r}
@@ -235,10 +252,47 @@ python_pkg_contributors %>%
   group_by(contributor) %>% 
   summarise(packages=n()) %>% 
   arrange(desc(packages))
-
 ```
 
-Who has contributed to both top R and Python packages?  Grouping by login name ensures that we don't get two different people with the same name.
+```{r}
+python_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors)) %>% 
+  ggplot(aes(as_factor(package),contributors)) + geom_col()+ coord_flip()
+```
+
+Looking at the number of contributors for the top packages in both languages, we find that Python packages tend to have many more contributors.
+```{r}
+n_p <-python_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors)) %>% 
+  mutate(language="Python") %>% 
+  rownames_to_column() %>% 
+  select(-package)
+
+n_r <- r_pkg_contributors %>% 
+  group_by(package) %>% 
+  summarise(contributors=n()) %>% 
+  arrange(desc(contributors)) %>% 
+  rownames_to_column() %>% 
+  mutate(language="R") %>% 
+  select(-package)
+
+contribs <- full_join(n_p,n_r) %>% mutate(rowname = as_factor(rowname))
+
+contribs   %>% 
+  ggplot(aes(rowname,contributors,group=language,color=language)) + 
+  geom_line(size=2) + 
+  theme(axis.text.x=element_blank()) +
+  labs(main="Top Python Packages Show More Collaboration",
+       x="Packages in Order of Contributors",
+       y="Number of Contributors")
+```
+
+
+Who has contributed to both top R and Python packages?  Grouping by login name ensures that we don't get two different people with the same name.  There are 44 people who have contributed to some of both the top Python and R packages.
 ```{r}
 c_p <- python_pkg_contributors %>% 
   group_by(login,contributor) %>% 
@@ -248,15 +302,73 @@ c_r <- r_pkg_contributors %>%
   group_by(login,contributor) %>% 
   summarise(r_packages=n())
 
-inner_join(c_r,c_p,by=c("contributor","login")) %>% arrange(desc(r_packages))
+inner_join(c_r,c_p,by=c("contributor","login")) %>% 
+  arrange(desc(r_packages))
 ```
+
+# Try to Determine Gender of Contributors
+
+We use the Social Security baby names database for 1990.  It is important to be aware of the limitations of this.
+
+1. I used 1990 because I guess that is close to the average birth year of most package contributors.  Is it?
+
+2. The dataset contains registered births for only the United States.  Many contributors were born, or live today, outside the U.S. The U.S, while more of a melting pot than many countries, will have a subset of global names.
+
+3. Transliteration of names from languages that don't use Western characters don't follow hard and fast rules. The same name might be transliterated multiple ways. "Sergey" or "Sergei?"
+
+4. Ordering of surname and given name.  Chinese names typically are reported surname first.  Many Chinese people follow western conventions in global settings but maybe not.  I may be tagging the surname as the given name in some (many?) cases.
+
+5. Many names are used for "both" (yes, I know) genders.  I choose an aribitrary ratio of gender predominance of 75% to pronounce certainty.  Noteworthy: "Hadley" is in our "Uncertain" bucket.
+
+6. Gender identity becomes a choice at some age.  People may choose (or not choose) a gender  inconsistant with the identification in this dataset.
+
+7. Some people use pseudonyms that are not common names.
+
+Knowing all that, let's plunge on.
+
 ```{r}
 load("data/names_90.rdata")
+names_90 <- names_90 %>% 
+  rename(first = Name) %>%
+  mutate(first = tolower(first)) %>% 
+  select(first,Gender,Count) %>% 
+  spread(Gender,Count) %>% 
+  mutate_if(is.numeric, ~replace(., is.na(.), 0)) %>% 
+  mutate(prob_female=F/(F+M))
 
+cutoff = 0.75 # threshhold probability for calling gender
+names_90 <- names_90 %>% mutate(gender="Uncertain")
+names_90 <- names_90 %>% mutate(gender=if_else(prob_female>cutoff,"Female",gender))
+names_90 <- names_90 %>% mutate(gender=if_else(prob_female<(1-cutoff),"Male",gender))
+names_90_subset <- names_90 %>% select(first,gender)
+```
+
+Now let's join the baby names to our contributors.
+```{r}
 r_pkg_contributors <-r_pkg_contributors %>%
   separate("contributor",into=c("first"),remove=FALSE,extra="drop")
 
 python_pkg_contributors <-python_pkg_contributors %>%
   separate("contributor",into=c("first"),remove=FALSE,extra="drop")
+
+r_genders <- r_pkg_contributors %>% 
+  select(-path,-avatar_url,-login) %>% 
+  mutate(first = tolower(first)) %>% 
+  left_join(names_90_subset) %>% 
+  mutate_all(~replace(., is.na(.),"Uncertain")) 
+
+python_genders <- python_pkg_contributors %>% 
+  select(-path,-avatar_url,-login) %>% 
+  mutate(first = tolower(first)) %>% 
+  left_join(names_90_subset) %>% 
+  mutate_all(~replace(., is.na(.),"Uncertain")) 
+
+```
+
+```{r}
+p_g <-python_genders %>% group_by(gender) %>% summarise(Python=n())
+r_g <-r_genders %>% group_by(gender) %>% summarise(R=n())
+
+full_join(p_g,r_g)
 ```
 
