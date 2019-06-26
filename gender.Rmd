@@ -381,3 +381,8 @@ agg_gender <- bind_rows(python_genders,r_genders) %>%
 
 percent(agg_gender,digits = 0)
 ```
+Women contribute to the top R packages at more than twice the rate of top Python packages.  Can we speculate as to a reason?  R is data science and Python is includes more CS.  With both languages, more than 90% of the contributors are men.  Clearly, we have a way to go with gender diversity in both communities.
+
+There are other dimensions of diversity we might look at that are beyond the ability to infer from names.  It would be nice if we could see actual images of all contributors so we might make some observations about racial diversity or remove some of the amiguities around gender identification.  This approach would come with its own set of challenges and risks, however.
+
+As mentioned at the start of this ariticle there are many reasons to take our conclusions with a grain of salt but the broad results conform with what we might intuitively expect.
