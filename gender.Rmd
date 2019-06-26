@@ -14,6 +14,7 @@ library(installr)
 library(data.table) #for downloading CRAN/RStudio logs
 library(httr)
 library(gh)
+library(formattable)
 
 source(file="download_RStudio_CRAN_data.R") 
 ```
@@ -366,9 +367,17 @@ python_genders <- python_pkg_contributors %>%
 ```
 
 ```{r}
-p_g <-python_genders %>% group_by(gender) %>% summarise(Python=n())
-r_g <-r_genders %>% group_by(gender) %>% summarise(R=n())
-
-full_join(p_g,r_g)
+agg_gender <- bind_rows(python_genders,r_genders) %>% 
+  select(language,gender) %>% 
+  table() 
+agg_gender %>% plot(main="Gender Representation in Package Contributions")
 ```
+For our ultimate conclusion, let's assume that the "Uncertain" gender breaks into male and female in the same proportions that already exist.
+```{r}
+agg_gender <- bind_rows(python_genders,r_genders) %>% 
+  filter(gender != "Uncertain") %>% 
+  select(language,gender) %>% 
+  table() %>% prop.table(margin=1) 
 
+percent(agg_gender,digits = 0)
+```
