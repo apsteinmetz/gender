@@ -3,9 +3,18 @@ title: "Gender Diversity in R vs Python"
 output: html_notebook
 ---
 
-Guidance on gender of Chinese names: http://blog.tutorming.com/mandarin-chinese-learning-tips/difference-chinese-male-and-female-names-gender
+Over the last few years I have really enjoyed becoming part of the R community.  One of the best things about the community is the welcoming, inclusive and supportive nature of it.  I can't speak for other communities in the computer or data science worlds but I am well aware of the "brogrammer" culture that can be off-putting at times. The rise of codes of conduct across the open source world is changing things for the better, I think.
 
-```{r}
+A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/).  This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world.
+
+We will take a multi-stage approach to getting some answers to this question.
+
+1. Get the names of the top packages in R and Python.
+2. Identify those packages which are maintained on Github.
+3. Get the contributors to those packages (not as easy as it sounds).
+4. 
+
+```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(purrr)
 library(jsonlite)
@@ -381,7 +390,7 @@ agg_gender <- bind_rows(python_genders,r_genders) %>%
 
 percent(agg_gender,digits = 0)
 ```
-Women contribute to the top R packages at more than twice the rate of top Python packages.  Can we speculate as to a reason?  R is data science and Python is includes more CS.  With both languages, more than 90% of the contributors are men.  Clearly, we have a way to go with gender diversity in both communities.
+There it is.  This was certainly a lot of work to get to a four cell crosstab but we have our answer. Women contribute to the top R packages at more than twice the rate of top Python packages.  Can we speculate as to a reason?  R is almost exclusively a data sciencej language and most of the top packages reflect that. Python is more of a general purpose language that is also quite popular for data science, but as we look down the list of most popular python packages we see more utility packages.  Perhaps women are less represented in general computer science than they are in data science. With both languages, more than 90% of the contributors are men.  Clearly, we have a way to go with gender diversity in both communities.  Narrowing down the package list to focus on just data science packages is an avenue for further exploration.
 
 There are other dimensions of diversity we might look at that are beyond the ability to infer from names.  It would be nice if we could see actual images of all contributors so we might make some observations about racial diversity or remove some of the amiguities around gender identification.  This approach would come with its own set of challenges and risks, however.
 
