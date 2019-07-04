@@ -5,30 +5,35 @@ output: html_notebook
 
 Over the last few years I have really enjoyed becoming part of the R community.  One of the best things about the community is the welcoming, inclusive and supportive nature of it.  I can't speak for other communities in the computer or data science worlds but I am well aware of the "brogrammer" culture that can be off-putting at times. The rise of codes of conduct across the open source world is changing things for the better, I think.
 
-A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/).  This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world.
+A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/).  This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world.  Most of these packages are maintained on github which includes all the contributors who use the github environment to contribute.  Let's take a stab at identifying the gender of these contributors by name.
 
-We will take a multi-stage approach to getting some answers to this question.
+We will take a multi-stage approach to getting an answer to this question.
 
 1. Get the names of the top packages in R and Python.
-2. Identify those packages which are maintained on Github.
+2. Identify which those packages which are maintained on Github.
 3. Get the contributors to those packages (not as easy as it sounds).
-4. 
+4. Get baby names by gender from the U.S. Social Security database.
+5. Decide whether a name is likely to be female or male.
+6. Map all package conrtributors to gender, where possible.
+
+As usual I follow a couple conventions.  The Tidyverse dialect is used throughout.  All functions to fetch data from the Web are wrapped in a test to see if the data was already retrieved.  This ensures that this notebook won't break if things in the wild change. In that event, you must get the data files from this github repo for this to work.
 
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(purrr)
 library(jsonlite)
 library(rvest)
-library(installr)
+# library(installr)
 library(data.table) #for downloading CRAN/RStudio logs
 library(httr)
 library(gh)
 library(formattable)
 
+# custom version of a  function from the installr package
 source(file="download_RStudio_CRAN_data.R") 
 ```
 
-Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror.
+Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror.  This is potentially a slow function but the top package downloads are pretty stable so we choose five randomly selected dates.
 
 ```{r get_top_R_packages}
 # ----------------------------------------------------------------
@@ -52,8 +57,7 @@ if (!file.exists("data/r_pkg_list.rdata")) {
 
 ```
 
-Source for top 100 Python packages over the last year: https://hugovk.github.io/top-pypi-packages/
-Get json (how helpful!).
+With Python the work as already been done for us here: https://hugovk.github.io/top-pypi-packages/. How helpful!
 
 ```{r get_top_python_packages}
 if (!file.exists("data/python_pkg_list.rdata")){
@@ -88,9 +92,6 @@ and that will return:
 
 
 ```{r get_package_contributors}
-library(dplyr)
-library(jsonlite)
-
 #this would actually be a list of multiple repos
 repo_name <- "Rcpp"
 language <- "r"
@@ -142,7 +143,7 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   search_url <- paste0("/search/repositories?q=",
                        repo_name
                       , "+language:", language
-                      ,  "+is:name"
+#                      ,  "+is:name"
 #                     ,"&sort=stars",
 #                     ,   "&order=desc"
   )
@@ -188,9 +189,13 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
 
 ```{r}
 load("data/r_pkg_list.rdata")
-# Rcpp package is not categorized as R langauge so I got it manually.
-r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
 if (!file.exists("data/r_pkg_contributors.rdata")){
+# Rcpp package is categorized as C, not R, langauge so get it manually.
+  # line below not working so I load pre-fetched data
+  # rcpp_contrib <- get_contrib_info("Rcpp",language="c")
+  load("data/contrib_info_rcpp.rdata")
+  
+  r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
   r_pkg_contributors <- NULL
 # use loop so we can save intermediate steps
   for(pkg in r_pkg_list$package) {
@@ -199,6 +204,7 @@ if (!file.exists("data/r_pkg_contributors.rdata")){
     save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
   }
 } else load("data/r_pkg_contributors.rdata")
+r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_rcpp)
 
 load("data/python_pkg_list.rdata")
 if (!file.exists("data/python_pkg_contributors.rdata")){
