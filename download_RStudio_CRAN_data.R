@@ -1,3 +1,7 @@
+# This is a modification of the function "download_RStudio_CRAN_data"
+# from the installr package by Tal Galili, et. al.
+# found here: https://cran.r-project.org/web/packages/installr/index.html
+
 download_RStudio_CRAN_data <- function (START = as.Date(Sys.time()) - 5, 
                                         END = as.Date(Sys.time()),
                                         log_folder = tempdir(),
