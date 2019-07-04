@@ -1,9 +1,10 @@
 ---
-title: "Gender Diversity in R vs Python"
+title: "Gender Diversity in R and Python Package Development"
 output: html_notebook
 ---
+# Introduction
 
-Over the last few years I have really enjoyed becoming part of the R community.  One of the best things about the community is the welcoming, inclusive and supportive nature of it.  I can't speak for other communities in the computer or data science worlds but I am well aware of the "brogrammer" culture that can be off-putting at times. The rise of codes of conduct across the open source world is changing things for the better, I think.
+Over the last few years I have really enjoyed becoming part of the R community.  One of the best things about the community is the welcoming, inclusive and supportive nature of it.  I can't speak for other communities in the computer or data science worlds but I am well aware of the "brogrammer" culture in some circles that can be off-putting at times. The rise of codes of conduct across the open source world is changing things for the better, I think.
 
 A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/).  This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world.  Most of these packages are maintained on github which includes all the contributors who use the github environment to contribute.  Let's take a stab at identifying the gender of these contributors by name.
 
@@ -29,9 +30,8 @@ library(httr)
 library(gh)
 library(formattable)
 
-# custom version of a  function from the installr package
-source(file="download_RStudio_CRAN_data.R") 
 ```
+# Identify the Top Packages in R and Python
 
 Use the cranlogs api from RStudio to get top package downloads from their CRAN mirror.  This is potentially a slow function but the top package downloads are pretty stable so we choose five randomly selected dates.
 
@@ -39,6 +39,9 @@ Use the cranlogs api from RStudio to get top package downloads from their CRAN m
 # ----------------------------------------------------------------
 #select 5 random days from the last six months
 # Read data from RStudio site
+# custom version of a  function from the installr package. See my Github repo.
+source(file="download_RStudio_CRAN_data.R") 
+
 if (!file.exists("data/r_pkg_list.rdata")) {
   RStudio_CRAN_dir <- download_RStudio_CRAN_data(START = Sys.Date()-180,END = Sys.Date(),sample=5)
   # read .gz compressed files form local directory
@@ -71,31 +74,34 @@ if (!file.exists("data/python_pkg_list.rdata")){
 } else load("data/python_pkg_list.rdata")
 
 ```
+# Get Contributor Names
 
-Build functions to get contributors to packages and then the real names of those contributors.
-Search for relevant repo with just repo name, no user.
+This is the messy stuff.  We build functions to get contributors to packages and then the real names of those contributors.
 
-https://api.github.com/search/repositories?q=dplyr%20is:name+language:r&sort=stars&order=desc
+We start with a search for the relevant repo with just repo name and optionally the language.  Suppose we want to know the names of the R `dplyr` contributors. The workflow looks like this:
 
-will return:
+Call the API endpoint.
+
+https://api.github.com/search/repositories?q=dplyr+language:r
+
+This will return at the top of the list:
       "full_name": "tidyverse/dplyr",
 
-use that to get contributors:
+Use the full name to get contributors.
 
 Contributor url: https://api.github.com/repos/tidyverse/dplyr/contributors
 
-will return all contributors with the JSON form:
-   "url": "https://api.github.com/users/romainfrancois",
+This JSON object will not contain the "real" names but the links to user profiles.  We make yet another call to the API to extract the real names.  Note some people use pseudonyms.
 
-and that will return:
+Calling "https://api.github.com/users/romainfrancois",
+
+will return, among other things:
+
    "name": "Romain François",
-
+   
+NOTE: You will need a Github API key for this work.  Please refer to the documentation for the `gh` package.
 
 ```{r get_package_contributors}
-#this would actually be a list of multiple repos
-repo_name <- "Rcpp"
-language <- "r"
-
 my_gh <- function(end_point) {
     return(jsonlite::fromJSON(jsonlite::toJSON(gh::gh(end_point)),simplifyVector = T))
 }
@@ -136,21 +142,16 @@ get_contributor_ids <- function(target_repo){
   }
 
 # --------------------------------------------------------------------
-get_contrib_info <- function(repo_name="dplyr",language="r"){
+get_contrib_info <- function(repo_name="dplyr",language=NULL){
   print(repo_name)
   # we don't know the github username associated with the package to construct a search
   # to get the most likely candidate
   search_url <- paste0("/search/repositories?q=",
-                       repo_name
-                      , "+language:", language
-#                      ,  "+is:name"
-#                     ,"&sort=stars",
-#                     ,   "&order=desc"
-  )
-  
-  
-  # first api call.  would need to would need to loop/map/apply over 
-  # multiple contributors repo names
+                       repo_name)
+  if (!is.null(language)){
+    search_url <- paste0(search_url,"+language:", language)
+  }
+  # first api call.
   repos <- my_gh(search_url) %>% .$items
   # return NULL if no repos in github are found
   if (length(repos) == 0) return(NULL)
@@ -173,7 +174,7 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
   
   # return null in case of no contributors
   if (is.null(contributor_ids)) return(NULL)
-  
+  if (is.null(language)) language <- "none"
   contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
   print(paste(length(contrib_names)," contributors"))
   contrib_info <- tibble(language=language,
@@ -190,21 +191,20 @@ get_contrib_info <- function(repo_name="dplyr",language="r"){
 ```{r}
 load("data/r_pkg_list.rdata")
 if (!file.exists("data/r_pkg_contributors.rdata")){
-# Rcpp package is categorized as C, not R, langauge so get it manually.
-  # line below not working so I load pre-fetched data
-  # rcpp_contrib <- get_contrib_info("Rcpp",language="c")
-  load("data/contrib_info_rcpp.rdata")
-  
-  r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
   r_pkg_contributors <- NULL
-# use loop so we can save intermediate steps
+# Rcpp package is categorized as C++, not R, langauge so get it manually.
+  contrib_info_rcpp <- get_contrib_info("Rcpp")
+  contrib_info_rcpp <- contrib_info_rcpp %>% mutate(language = "r")
+  r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_rcpp)
+  r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
+
+  # use for loop instead of map or apply so we can save intermediate steps
   for(pkg in r_pkg_list$package) {
     r_pkg_contributors <- r_pkg_contributors %>% 
       bind_rows(get_contrib_info(pkg,language="r"))
     save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
   }
 } else load("data/r_pkg_contributors.rdata")
-r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_rcpp)
 
 load("data/python_pkg_list.rdata")
 if (!file.exists("data/python_pkg_contributors.rdata")){
@@ -214,9 +214,10 @@ if (!file.exists("data/python_pkg_contributors.rdata")){
       bind_rows(get_contrib_info(pkg,language="python"))
     save(python_pkg_contributors,file="data/python_pkg_contributors.rdata")
   }  
-} else load("data/r_pkg_contributors.rdata")
+} else load("data/python_pkg_contributors.rdata")
 ```
-#Analysis
+# Analysis
+
 Now that we have the package contributor database. Do some analysis.
 
 ```{r}
@@ -396,7 +397,7 @@ agg_gender <- bind_rows(python_genders,r_genders) %>%
 
 percent(agg_gender,digits = 0)
 ```
-There it is.  This was certainly a lot of work to get to a four cell crosstab but we have our answer. Women contribute to the top R packages at more than twice the rate of top Python packages.  Can we speculate as to a reason?  R is almost exclusively a data sciencej language and most of the top packages reflect that. Python is more of a general purpose language that is also quite popular for data science, but as we look down the list of most popular python packages we see more utility packages.  Perhaps women are less represented in general computer science than they are in data science. With both languages, more than 90% of the contributors are men.  Clearly, we have a way to go with gender diversity in both communities.  Narrowing down the package list to focus on just data science packages is an avenue for further exploration.
+There it is.  This was certainly a lot of work to get to a four cell crosstab but we have our answer. Women contribute to the top R packages at more than twice the rate of top Python packages.  Can we speculate as to a reason?  R is almost exclusively a data science language and most of the top packages reflect that. Python is more of a general purpose language that is also quite popular for data science, but as we look down the list of most popular python packages we see more utility packages.  Perhaps women are less represented in general computer science than they are in data science. With both languages, more than 90% of the contributors are men.  Clearly, we have a way to go with gender diversity in both communities.  Narrowing down the package list to focus on just data science packages is an avenue for further exploration.
 
 There are other dimensions of diversity we might look at that are beyond the ability to infer from names.  It would be nice if we could see actual images of all contributors so we might make some observations about racial diversity or remove some of the amiguities around gender identification.  This approach would come with its own set of challenges and risks, however.
 
