@@ -85,22 +85,27 @@ Call the API endpoint.
 https://api.github.com/search/repositories?q=dplyr+language:r
 
 This will return at the top of the list:
-      "full_name": "tidyverse/dplyr",
+      "full_name": "tidyverse/dplyr"
+      
+One problem I encountered is that not all R packages are tagged as being in the R language.  In particular, `Rcpp` and `data.table` are considered C language repos by Github.  This is one reason why not all the top packages appear to have Github repos. I manually grab the contributors for the two packages mentioned above but, out of laziness, I didn't go looking for any other missing packages.  As we will see, most of the top 100 packages for both languages are found so we have a fairly representative sample...I assume.
 
-Use the full name to get contributors.
+Once we have the full package name we can create URLs to get the usernames of all the contributors.
 
 Contributor url: https://api.github.com/repos/tidyverse/dplyr/contributors
 
-This JSON object will not contain the "real" names but the links to user profiles.  We make yet another call to the API to extract the real names.  Note some people use pseudonyms.
+This JSON object will not contain the "real" names but the links to user profiles.  We have to make yet another call to the API to extract the real names.  Note some people use pseudonyms so the real name won't be available.
 
-Calling "https://api.github.com/users/romainfrancois",
+Calling the endpoint for the username "https://api.github.com/users/romainfrancois",
 
 will return, among other things:
 
-   "name": "Romain François",
+   "name": "Romain François"
+   
+Finally, we get what we are after!
    
 NOTE: You will need a Github API key for this work.  Please refer to the documentation for the `gh` package.
 
+The utility functions are below:
 ```{r get_package_contributors}
 my_gh <- function(end_point) {
     return(jsonlite::fromJSON(jsonlite::toJSON(gh::gh(end_point)),simplifyVector = T))
@@ -187,7 +192,7 @@ get_contrib_info <- function(repo_name="dplyr",language=NULL){
 }
 ```
 
-
+Now let's do the work of iterating through the package lists.  As mentioned above, I get two packages manually before looping through the remaining packages.  I chose to use a `for` loop, as opposed to `map` or `apply` so we can save the intermediate results. It is a fairly slow process and you may reach your API data limit before finishing.  You don't want to start from scratch halfway through!  If you have to do this in multiple sessions, manually edit the package lists to include just what is left to retrieve.
 ```{r}
 load("data/r_pkg_list.rdata")
 if (!file.exists("data/r_pkg_contributors.rdata")){
@@ -231,29 +236,13 @@ r_pkg_contributors %>%
   summary()
 ```
 
-There are 73 out of the top 100 R packages with repos on Github.  The average number of contributors is 30. 300 people have contributed to the `fs` package, which is implements the linux file library `libuv`.
+There are 73 out of the top 100 R packages with repos we *easily* found on Github (remember, I'm lazy).  The median number of contributors is 10. 300 people have contributed to the `fs` package, which is implements the linux file library `libuv`.
 
-View the distribution of contributor count.
 ```{r}
-r_pkg_contributors %>% 
-  group_by(package) %>% 
-  summarise(contributors=n()) %>% 
-  arrange(desc(contributors)) %>% 
-  ggplot(aes(as_factor(package),contributors)) + geom_col()+ coord_flip()
-```
-
-
-
-
-Who are the most prolific contributors among the top packages.  We note that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors.  No one tidyverse package acts as a proxy for the rest, however.
-```{r}
-r_pkg_contributors %>% 
-  group_by(contributor) %>% 
-  summarise(packages=n()) %>% 
-  arrange(desc(packages))
 
 ```
 
+How did we do with the Python packages?
 ```{r}
 load("data/python_pkg_contributors.rdata")
 
@@ -264,44 +253,77 @@ python_pkg_contributors %>%
   arrange(desc(contributors)) %>% 
   summary()
 ```
+
+Right off the bat, it looks like Python package development is more of a community effort.  The median package has 44 contributors.  The venerable `matplotlib` takes the prize of most contributors at 429.
+
+Let's merge the two datasets to simply handling.
 ```{r}
-python_pkg_contributors %>% 
+pkg_contributors <- bind_rows(r_pkg_contributors,python_pkg_contributors)
+```
+
+Let's look at the most contributed-to packages. Remember this is NOT a ranking of the most popular packages. It is a ranking of the number of contributors among the most popular packages.  For R, the takeaway is that the Tidyverse is very much a shared effort.
+```{r}
+pkg_contributors %>% 
+  filter(language=="r") %>% 
+  group_by(package) %>%
+  summarise(contributors=n()) %>% 
+  arrange(contributors) %>%
+  top_n(10,wt=contributors) %>% 
+  ggplot(aes(as_factor(package),contributors)) + 
+  geom_col()+ 
+  labs(main = "R Packages", x = "Package Name",y = "Contributor Count") +
+  coord_flip()
+```
+```{r}
+pkg_contributors %>% 
+  filter(language=="python") %>% 
+  group_by(package) %>%
+  summarise(contributors=n()) %>% 
+  arrange(contributors) %>%
+  top_n(10,wt=contributors) %>% 
+  ggplot(aes(as_factor(package),contributors)) + 
+  geom_col()+ 
+  labs(main = "Python Packages", x = "Package Name",y = "Contributor Count") +
+  coord_flip()
+```
+
+Who are the most prolific contributors among the top packages?  We note, with R, that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors.  No one tidyverse package acts as a proxy for the rest, however.
+
+## Most Prolific R Package Contributors
+```{r}
+pkg_contributors %>% 
+  filter(language=="r") %>% 
+  group_by(contributor) %>% 
+  summarise(packages=n()) %>% 
+  arrange(desc(packages))
+```
+## Most Prolific Python Package Contributors
+```{r}
+pkg_contributors %>% 
+  filter(language=="python") %>% 
   group_by(contributor) %>% 
   summarise(packages=n()) %>% 
   arrange(desc(packages))
 ```
 
-```{r}
-python_pkg_contributors %>% 
-  group_by(package) %>% 
-  summarise(contributors=n()) %>% 
-  arrange(desc(contributors)) %>% 
-  ggplot(aes(as_factor(package),contributors)) + geom_col()+ coord_flip()
-```
-
 Looking at the number of contributors for the top packages in both languages, we find that Python packages tend to have many more contributors.
 ```{r}
-n_p <-python_pkg_contributors %>% 
-  group_by(package) %>% 
+summary_contrib<-pkg_contributors %>% 
+  group_by(language,package) %>% 
   summarise(contributors=n()) %>% 
   arrange(desc(contributors)) %>% 
-  mutate(language="Python") %>% 
-  rownames_to_column() %>% 
-  select(-package)
+  rownames_to_column(var="index")
 
-n_r <- r_pkg_contributors %>% 
-  group_by(package) %>% 
-  summarise(contributors=n()) %>% 
-  arrange(desc(contributors)) %>% 
-  rownames_to_column() %>% 
-  mutate(language="R") %>% 
-  select(-package)
-
-contribs <- full_join(n_p,n_r) %>% mutate(rowname = as_factor(rowname))
-
-contribs   %>% 
-  ggplot(aes(rowname,contributors,group=language,color=language)) + 
-  geom_line(size=2) + 
+summary_contrib %>% 
+  ungroup() %>% 
+  filter(language=="r") %>% 
+  select(contributors) %>%
+  rownames_to_column(var="index") %>% 
+  arrange(contributors) %>% 
+  
+#  ggplot(aes(index,contributors,group=language,color=language)) + 
+  ggplot(aes(index,contributors)) + 
+  geom_col(size=2) + 
   theme(axis.text.x=element_blank()) +
   labs(main="Top Python Packages Show More Collaboration",
        x="Packages in Order of Contributors",
