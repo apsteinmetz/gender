@@ -6,7 +6,7 @@ output: html_notebook
 
 Over the last few years I have really enjoyed becoming part of the R community. One of the best things about the community is the welcoming, inclusive and supportive nature of it. I can't speak for other communities in the computer or data science worlds but I am well aware of the "brogrammer" culture in some circles that can be off-putting at times. The rise of codes of conduct across the open source world is changing things for the better, I think.
 
-A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/). This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world. Most of these packages are maintained on github which includes all the contributors who use the github environment to contribute. Let's take a stab at identifying the gender of these contributors by name.
+A couple months ago the creator of Python was interviewed saying [he thinks open source programming languages have a gender diversity problem](https://qz.com/1624252/pythons-creator-thinks-it-has-a-diversity-problem/). This got me to thinking about whether the inclusive environment I observe in the R community is reflected in female contributions to popular packages and how it compares to the Python world. Most of these packages are maintained on Github which includes all the contributors who use the Github environment to contribute. Let's take a stab at identifying the gender of these contributors by name.
 
 We will take a multi-stage approach to getting an answer to this question.
 
@@ -24,11 +24,10 @@ library(tidyverse)
 library(purrr)
 library(jsonlite)
 library(rvest)
-# library(installr)
 library(data.table) #for downloading CRAN/RStudio logs
 library(httr)
 library(gh)
-library(formattable)
+library(formattable) #percent
 
 ```
 ## Identify the top packages in R and Python.
@@ -149,47 +148,47 @@ get_contributor_ids <- function(target_repo){
 
 # --------------------------------------------------------------------
 get_contrib_info <- function(repo_name="dplyr",language=NULL){
- print(repo_name)
- # we don't know the github username associated with the package to construct a search
- # to get the most likely candidate
- search_url <- paste0("/search/repositories?q=",
-            repo_name)
- if (!is.null(language)){
-  search_url <- paste0(search_url,"+language:", language)
- }
- # first api call.
- repos <- my_gh(search_url) %>% .$items
- # return NULL if no repos in github are found
- if (length(repos) == 0) return(NULL)
- 
- # get full path for exact match on repo name
- # there might be more than one user with repo of the same name
- # Since they will be in order of github "score", take just the first one
- target_repo <- repos %>% 
-  select(name,full_name) %>% 
-  filter(name == repo_name) %>%
-  pull(full_name) %>% 
-  .[1] %>% 
-  unlist()
- # return NULL if no repos in github are found
- if (is.null(target_repo)) return(NULL)
- 
- #second api call
- # get user urls for all contributors
- contributor_ids <- get_contributor_ids(target_repo)
- 
- # return null in case of no contributors
- if (is.null(contributor_ids)) return(NULL)
- if (is.null(language)) language <- "none"
- contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
- print(paste(length(contrib_names)," contributors"))
- contrib_info <- tibble(language=language,
-             package=repo_name,
-             path=target_repo,
-             contributor=contrib_names) %>% 
-  bind_cols(contributor_ids) %>% 
-  select(-url) %>% unnest()
- return(contrib_info)
+  print(repo_name)
+  # we don't know the Github username associated with the package
+  #so construct a search to get the most likely candidate
+  search_url <- paste0("/search/repositories?q=",
+                       repo_name)
+  if (!is.null(language)){
+    search_url <- paste0(search_url,"+language:", language)
+  }
+  # first api call.
+  repos <- my_gh(search_url) %>% .$items
+  # return NULL if no repos in Github are found
+  if (length(repos) == 0) return(NULL)
+  
+  # get full path for exact match on repo name
+  # there might be more than one user with repo of the same name
+  # Since they will be in order of Github "score", take just the first one
+  target_repo <- repos %>% 
+    select(name,full_name) %>% 
+    filter(name == repo_name) %>%
+    pull(full_name) %>% 
+    .[1] %>% 
+    unlist()
+  # return NULL if no repos in Github are found
+  if (is.null(target_repo)) return(NULL)
+  
+  #second api call
+  # get user urls for all contributors
+  contributor_ids <- get_contributor_ids(target_repo)
+  
+  # return null in case of no contributors
+  if (is.null(contributor_ids)) return(NULL)
+  if (is.null(language)) language <- "none"
+  contrib_names<-map(contributor_ids$url,get_name) %>% unlist()
+  print(paste(length(contrib_names)," contributors"))
+  contrib_info <- tibble(language=language,
+                         package=repo_name,
+                         path=target_repo,
+                         contributor=contrib_names) %>% 
+    bind_cols(contributor_ids) %>% 
+    select(-url) %>% unnest()
+  return(contrib_info)
 }
 ```
 
@@ -242,7 +241,6 @@ load("data/r_pkg_contributors.rdata")
 r_pkg_contributors %>% 
  group_by(package) %>% 
  summarise(contributors=n()) %>% 
- arrange(desc(contributors)) %>% 
  summary()
 ```
 
@@ -256,7 +254,6 @@ load("data/python_pkg_contributors.rdata")
 python_pkg_contributors %>% 
  group_by(package) %>% 
  summarise(contributors=n()) %>% 
- arrange(desc(contributors)) %>% 
  summary()
 ```
 
@@ -288,26 +285,7 @@ pkg_contributors %>%
  coord_flip()
 ```
 
-Who are the most prolific contributors among the top packages? We note, with R, that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors. No one Tidyverse package is a good proxy of the contributors to the rest, however.
-
-## Who are the most prolific R package contributors
-```{r}
-pkg_contributors %>% 
- filter(language=="r") %>% 
- group_by(contributor) %>% 
- summarise(packages=n()) %>% 
- arrange(desc(packages))
-```
-## Who are the most prolific Python package contributors
-```{r}
-pkg_contributors %>% 
- filter(language=="python") %>% 
- group_by(contributor) %>% 
- summarise(packages=n()) %>% 
- arrange(desc(packages))
-```
-
-Looking at the number of contributors for the top packages in both languages, we find that Python packages tend to have many more contributors.
+Let's compare the number of contributors for the top packages in both languages, we find that Python packages tend to have many more contributors.  
 ```{r}
 summary_contrib<-pkg_contributors %>% 
  group_by(language,package) %>% 
@@ -325,6 +303,25 @@ summary_contrib %>%
     x="Packages in Order of Contributors",
     y="Number of Contributors")
 ```
+Who are the most prolific contributors among the top packages? We note, with R, that many of the top packages are part of the tidyverse ecosystem and will have a very high degree of overlap among package contributors. No one Tidyverse package is a good proxy of the contributors to the rest, however.
+
+## Who are the most prolific R package contributors?
+```{r}
+pkg_contributors %>% 
+ filter(language=="r") %>% 
+ group_by(contributor) %>% 
+ summarise(packages=n()) %>% 
+ arrange(desc(packages))
+```
+## Who are the most prolific Python package contributors?
+```{r}
+pkg_contributors %>% 
+ filter(language=="python") %>% 
+ group_by(contributor) %>% 
+ summarise(packages=n()) %>% 
+ arrange(desc(packages))
+```
+
 
 ## People who swing both ways.
 
@@ -346,7 +343,7 @@ two_lang_contrib
 
 ## Try to determine gender of contributors.
 
-I hope you found the digressions above interesting. Now lets do what we came to do. 
+I hope you found the digressions above interesting. Now let's do what we came to do. 
 
 To flag names by gender we use the Social Security baby names database for 1990. It is important to be aware of the limitations of this.
 
@@ -389,43 +386,49 @@ names_90_subset <- names_90 %>% select(first,gender)
 
 Now let's join the baby names to our contributors.
 ```{r}
-r_pkg_contributors <-r_pkg_contributors %>%
+pkg_contributors <-pkg_contributors %>%
  separate("contributor",into=c("first"),remove=FALSE,extra="drop")
-
-python_pkg_contributors <-python_pkg_contributors %>%
- separate("contributor",into=c("first"),remove=FALSE,extra="drop")
-
-r_genders <- r_pkg_contributors %>% 
+genders <- pkg_contributors %>% 
  select(-path,-avatar_url,-login) %>% 
  mutate(first = tolower(first)) %>% 
- left_join(names_90_subset) %>% 
+ left_join(names_90_subset,by="first") %>% 
  mutate_all(~replace(., is.na(.),"Uncertain")) 
-
-python_genders <- python_pkg_contributors %>% 
- select(-path,-avatar_url,-login) %>% 
- mutate(first = tolower(first)) %>% 
- left_join(names_90_subset) %>% 
- mutate_all(~replace(., is.na(.),"Uncertain")) 
-
 ```
-
+Our answer now looms into view.  Base R has a nice tile plot that illustrates the proportions and sizes of the cells in a crosstab so we'll use that.
 ```{r}
-agg_gender <- bind_rows(python_genders,r_genders) %>% 
+agg_gender <- genders %>%  
  select(language,gender) %>% 
  table() 
 agg_gender %>% plot(main="Gender Representation in Package Contributions")
 ```
+
+Right away we note the large fraction of "Uncertain" genders, about a third.  As we noted above, there are many more contributors to Python packages, as reflected in the width of the tiles.  We also can see that the fraction of women contributing to R packages looks greater.
+
 For our ultimate conclusion, let's assume that the "Uncertain" gender breaks into male and female in the same proportions that already exist.
 ```{r}
-agg_gender <- bind_rows(python_genders,r_genders) %>% 
+agg_gender <- genders %>% 
  filter(gender != "Uncertain") %>% 
  select(language,gender) %>% 
  table() %>% prop.table(margin=1) 
 
 percent(agg_gender,digits = 0)
 ```
-There it is. This was certainly a lot of work to get to a four cell crosstab but we have our answer. Women contribute to the top R packages at more than twice the rate of top Python packages. Can we speculate as to a reason? R is almost exclusively a data science language and most of the top packages reflect that. Python is more of a general purpose language that is also quite popular for data science, but as we look down the list of most popular python packages we see more utility packages. Perhaps women are less represented in general computer science than they are in data science. With both languages, more than 90% of the contributors are men. Clearly, we have a way to go with gender diversity in both communities. Narrowing down the package list to focus on just data science packages is an avenue for further exploration.
+There it is. This was certainly a lot of work to get to a four cell crosstab but we have our answer. **Women contribute to the top R packages at twice the rate of top Python packages.** Can we speculate as to a reason? R is almost exclusively a data science language and most of the top packages reflect that. Python is more of a general purpose language that is also quite popular for data science, but as we look down the list of most popular Python packages we see more utility packages. Perhaps women are less represented in general computer science than they are in data science. With both languages, more than 90% of the contributors are men. Clearly, we have a way to go with gender diversity in both communities. Narrowing down the package list to focus on just data science packages is an avenue for further exploration.
 
-There are other dimensions of diversity we might look at that are beyond the ability to infer from names. It would be nice if we could see actual images of all contributors so we might make some observations about racial diversity or remove some of the amiguities around gender identification. This approach would come with its own set of challenges and risks, however.
+As a bonus, what are the most "feminine" packages?
+```{r}
+genders %>% group_by(language,package,gender) %>% 
+  filter(gender != "Uncertain") %>% 
+  count() %>% 
+  spread(gender,n) %>% 
+  mutate(frac_female = Female/(Female+Male)) %>% 
+  arrange(desc(frac_female))
+```
 
-As mentioned at the start of this ariticle there are many reasons to take our conclusions with a grain of salt but the broad results conform with what we might intuitively expect.
+That's interesting. There are 28 popular packages across both languages where more than 10% of the contributors are female. Of those 25 are R packages and only 3 are Python packages.
+
+There are other dimensions of diversity we might look at that are beyond the ability to infer from names. It would be nice if we could see actual images of all contributors so we might make some observations about racial diversity or remove some of the ambiguities around gender identification. This approach would come with its own set of challenges and risks, however.
+
+As mentioned at the start of this ariticle, there are many reasons to take our conclusions with a grain of salt.  I certainly do not claim this analysis is definitive. A better approach might be to simply survey the contributors. Still, the results conform with what intuition might provide.
+
+I welcome critiques of my methods or conclusions.  I have a sneaky suspicion I got the Github contributor names the hard way.  Thanks for reading!
