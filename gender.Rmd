@@ -308,22 +308,20 @@ pkg_contributors %>%
 
 Looking at the number of contributors for the top packages in both languages, we find that Python packages tend to have many more contributors.
 ```{r}
+
+
 summary_contrib<-pkg_contributors %>% 
   group_by(language,package) %>% 
-  summarise(contributors=n()) %>% 
-  arrange(desc(contributors)) %>% 
-  rownames_to_column(var="index")
+  summarise(num_contributors=n()) %>% 
+  group_by(language) %>% 
+  mutate(ranking=rank(num_contributors,ties.method = "first")) %>%
+  mutate(ranking=max(ranking)-ranking+1) %>% 
+  arrange(ranking)
+
 
 summary_contrib %>% 
-  ungroup() %>% 
-  filter(language=="r") %>% 
-  select(contributors) %>%
-  rownames_to_column(var="index") %>% 
-  arrange(contributors) %>% 
-  
-#  ggplot(aes(index,contributors,group=language,color=language)) + 
-  ggplot(aes(index,contributors)) + 
-  geom_col(size=2) + 
+  ggplot(aes(ranking,num_contributors,group=language,color=language)) + 
+  geom_path(size=2) + 
   theme(axis.text.x=element_blank()) +
   labs(main="Top Python Packages Show More Collaboration",
        x="Packages in Order of Contributors",
