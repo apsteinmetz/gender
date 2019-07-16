@@ -197,19 +197,25 @@ Now let's do the work of iterating through the package lists. As mentioned above
 ```{r}
 load("data/r_pkg_list.rdata")
 if (!file.exists("data/r_pkg_contributors.rdata")){
- r_pkg_contributors <- NULL
-# Rcpp package is categorized as C++, not R, langauge so get it manually.
- contrib_info_rcpp <- get_contrib_info("Rcpp")
- contrib_info_rcpp <- contrib_info_rcpp %>% mutate(language = "r")
- r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_rcpp)
- r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
-
- # use for loop instead of map or apply so we can save intermediate steps
- for(pkg in r_pkg_list$package) {
-  r_pkg_contributors <- r_pkg_contributors %>% 
-   bind_rows(get_contrib_info(pkg,language="r"))
-  save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
- }
+  r_pkg_contributors <- NULL
+  # Rcpp package is categorized as C++, not R, langauge so get it manually.
+  contrib_info_rcpp <- get_contrib_info("Rcpp")
+  contrib_info_rcpp <- contrib_info_rcpp %>% mutate(language = "r")
+  r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_rcpp)
+  r_pkg_list <- r_pkg_list %>% filter(package != "Rcpp")
+  
+  # data.table package is categorized as C++, not R, langauge so get it manually.
+  contrib_info_dt <- get_contrib_info("data.table")
+  contrib_info_dt <- contrib_info_dt %>% mutate(language = "r")
+  r_pkg_contributors <- bind_rows(r_pkg_contributors,contrib_info_dt)
+  r_pkg_list <- r_pkg_list %>% filter(package != "dt")
+  
+  # use for loop instead of map or apply so we can save intermediate steps
+  for(pkg in r_pkg_list$package) {
+    r_pkg_contributors <- r_pkg_contributors %>% 
+      bind_rows(get_contrib_info(pkg,language="r"))
+    save(r_pkg_contributors,file="data/r_pkg_contributors.rdata")
+  }
 } else load("data/r_pkg_contributors.rdata")
 
 load("data/python_pkg_list.rdata")
