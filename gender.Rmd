@@ -328,19 +328,22 @@ summary_contrib %>%
        y="Number of Contributors")
 ```
 
+## People who swing both ways
 
-Who has contributed to both top R and Python packages?  Grouping by login name ensures that we don't get two different people with the same name.  There are 44 people who have contributed to some of both the top Python and R packages.
+Who are the awesome humand who have contributed to both top R and Python packages?  Grouping by login name ensures that we don't get two different people with the same name but we drop it for display.  There are 44 people who have contributed to some of both the top Python and R packages.
 ```{r}
-c_p <- python_pkg_contributors %>% 
-  group_by(login,contributor) %>% 
-  summarise(python_packages=n())
 
-c_r <- r_pkg_contributors %>% 
-  group_by(login,contributor) %>% 
-  summarise(r_packages=n())
+two_lang_contrib <- pkg_contributors %>% 
+  group_by(login,contributor,language) %>%
+  summarise(packages=n()) %>% 
+  spread(language,packages) %>% 
+  ungroup() %>% 
+  select(-login)
 
-inner_join(c_r,c_p,by=c("contributor","login")) %>% 
-  arrange(desc(r_packages))
+two_lang_contrib <- two_lang_contrib[complete.cases(two_lang_contrib),] %>% 
+  arrange(desc(r))
+
+two_lang_contrib  
 ```
 
 # Try to Determine Gender of Contributors
